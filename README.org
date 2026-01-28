@@ -1,6 +1,6 @@
 * Requirements
 
-- Mikrotik router(wihtout or without containers support) with SNMP support
+- Mikrotik router(wihth or without containers support) with SNMP support
 - Spare Raspberry PI 3/4/5
 
 
