@@ -123,4 +123,4 @@ scrape_configs:
 And we have a nice looking dashboard for mikrotik. If any of the steps go south,
 I think its ok to use generated snmp.yml in this project.
 
-[[file:Jeep_Cherokee_XJ/grafana.png][file:Jeep_Cherokee_XJ/grafana.png]]
+[[file:./grafana.png][file:./grafana.png]]
