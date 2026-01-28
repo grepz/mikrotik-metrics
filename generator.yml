@@ -1,0 +1,47 @@
+---
+auths:
+  public_v1:
+    version: 1
+  public_v2:
+    version: 2
+
+modules:
+  mikrotik:
+    lookups:
+      - source_indexes: [ifIndex]
+        lookup: ifName
+      - source_indexes: [mtxrInterfaceStatsIndex]
+        lookup: ifName
+      - source_indexes: [mtxrGaugeIndex]
+        lookup: mtxrGaugeName
+        drop_source_indexes: true
+      - source_indexes: [mtxrNeighborIndex]
+        lookup: mtxrNeighborMacAddress
+        drop_source_indexes: true
+      - source_indexes: [mtxrNeighborIndex]
+        lookup: mtxrNeighborInterfaceID
+      - source_indexes: [mtxrNeighborInterfaceID]
+        lookup: ifName
+        drop_source_indexes: true
+      - source_indexes: [mtxrOpticalIndex]
+        lookup: mtxrOpticalName
+      - source_indexes: [mtxrPOEInterfaceIndex]
+        lookup: mtxrPOEName
+      - source_indexes: [mtxrPartitionIndex]
+        lookup: mtxrPartitionName
+      - source_indexes: [mtxrRemoteCapId]
+        lookup: mtxrRemoteCapIdentity
+        drop_source_indexes: true
+      - source_indexes: [mtxrWifiInterfacesId]
+        lookup: ifName
+        drop_source_indexes: true
+      - source_indexes: [mtxrWifiRegistrationInterface]
+        lookup: ifName
+        drop_source_indexes: true
+    overrides:
+      mtxrRemoteCapIdentity:
+        ignore: true # information is redundant
+      mtxrWifiInterfacesName:
+        ignore: true # information is redundant
+      mtxrWifiRegistrationMacAddress:
+        ignore: true # information is redundant

@@ -1,0 +1,126 @@
+* Requirements
+
+- Mikrotik router(wihtout or without containers support) with SNMP support
+- Spare Raspberry PI 3/4/5
+
+
+* Software versions
+- prometheus
+#+BEGIN_SRC txt
+prometheus, version 2.53.3+ds1 (branch: debian/sid, revision: 2.53.3+ds1-2)
+  build user:       team+pkg-go@tracker.debian.org
+  build date:       20250623-18:11:33
+  go version:       go1.24.4
+  platform:         linux/arm64
+  tags:             unknown
+#+END_SRC
+- prometheus-snmp-exporter
+#+BEGIN_SRC txt
+snmp_exporter, version 0.28.0 (branch: debian/sid, revision: 0.28.0-1+b5)
+  build user:       team+pkg-go@tracker.debian.org
+  build date:       20250622-22:09:43
+  go version:       go1.24.4
+  platform:         linux/arm64
+  tags:             unknown
+#+END_SRC
+- grafana-server
+#+BEGIN_SRC txt
+Version 12.3.1 (commit: 0d1a5b4420a5e4579b91c239ecb240ea2b247fba, branch: release-12.3.1)
+#+END_SRC
+
+
+* Preparation steps
+0. Add and prepare grafana repo to actually use in debian vanilla system
+   #+BEGIN_SRC sh
+     wget -q -O - https://apt.grafana.com/gpg.key | gpg --dearmor | sudo tee /etc/apt/keyrings/grafana.gpg > /dev/null
+     echo "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main" | sudo tee -a /etc/apt/sources.list.d/grafana.list
+   #+END_SRC
+1. Install a bunch of software needed for the process of integration SNMP metrics to prometheus-like
+   #+BEGIN_SRC sh
+     sudo apt install snmp-mibs-downloader snmp prometheus-snmp-exporter prometheus grafana
+   #+END_SRC
+2. Download mikrotik mib's
+   #+BEGIN_SRC sh
+     wget http://download2.mikrotik.com/Mikrotik.mib
+   #+END_SRC
+
+* Configure Mikrotik
+Configure SNMP on Mikrotik so that /snmp section is looking something like that:
+#+BEGIN_SRC sh
+/snmp> print
+          enabled: yes
+          contact:
+         location:
+        engine-id:
+      trap-target:
+   trap-community: public
+     trap-version: 1
+  trap-generators: temp-exception
+#+END_SRC
+Make sure that SNMP is available only for you private/personal network
+#+BEGIN_SRC sh
+/snmp community> print
+Flags: * - default, X - disabled
+ #    NAME                             ADDRESSES                                                              SECURITY   READ-ACCESS WRITE-ACCESS
+ 0 *  public                           192.168.111.0/24                                                        none       yes         no          
+                                       192.168.112.0/24
+#+END_SRC
+Apply setup, make sure that SNMP is actually working for you:
+#+BEGIN_SRC sh
+snmpwalk -v 1 -c public 192.168.0.1
+#+END_SRC
+You should see a flow of actual data
+
+* Configure host with prometheus and stuff
+0. Download mibs(utility was installed earlier with apt)
+   #+BEGIN_SRC sh
+     download-mibs
+   #+END_SRC
+1. Grafana configuration is not important in this case.
+2. prometheus configuration
+#+BEGIN_SRC yaml
+# A scrape configuration containing exactly one endpoint to scrape:
+# Here it's Prometheus itself.
+scrape_configs:
+  - job_name: Mikroik
+    scrape_interval: 10s
+    scrape_timeout: 10s
+    static_configs:
+      # Actual Mikrotik ip address here:
+      - targets: ['192.168.0.1']
+    metrics_path: /snmp
+    params:
+      auth: [public_v2]
+      module: [mikrotik]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: localhost:9116  # The SNMP exporter host and port
+#+END_SRC
+3. snmp.yml generation
+   I used following [[file:./generator.yml][file:generator.yml]] for the sake of snmp.yml generation.
+   Run generation, use downloaded earlier Mikrotik.mib:
+   #+BEGIN_SRC sh
+     prometheus-snmp-generator -m Mikrotik.mib generate -g generator.yml -o snmp.yml
+     time=2026-01-28T21:15:57.612Z level=INFO source=net_snmp.go:174 msg="Loading MIBs" from=snmp/Mikrotik.mib
+     time=2026-01-28T21:15:57.613Z level=INFO source=main.go:57 msg="Generating config for module" module=mikrotik
+     time=2026-01-28T21:15:57.613Z level=INFO source=main.go:75 msg="Generated metrics" module=mikrotik metrics=0
+     time=2026-01-28T21:15:57.613Z level=INFO source=main.go:100 msg="Config written" file=snmp_working/snmp.yml
+   #+END_SRC
+   Generated [[file:./snmp.yml][file:snmp.yml]]
+   Copy that file to
+   #+BEGIN_SRC sh
+     sudo cp snmp.yml /etc/prometheus/snmp.yml
+   #+END_SRC
+4. Restart all the services(prometheus, prometheus-snmp-worker, grafana)
+5. Import grafana dashboard, any you like, I use the one saved in this project,
+   courtesy of its author.
+   [[file:./mikrotik-grafana-dashboard.json][file:mikrotik-grafana-dashboard.json]]
+* Result
+And we have a nice looking dashboard for mikrotik. If any of the steps go south,
+I think its ok to use generated snmp.yml in this project.
+
+[[file:Jeep_Cherokee_XJ/grafana.png][file:Jeep_Cherokee_XJ/grafana.png]]
